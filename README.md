@@ -1,7 +1,7 @@
 # Ingenieria del Software II - Template
 
-[![Build Status](https://travis-ci.org/MaleBurs/2021-superpoderosas.svg?branch=master)](https://travis-ci.org/uca-is2/2021-superpoderosas)
-[![Coverage Status](https://coveralls.io/repos/github/uca-is2/2021-superpoderosas/badge.svg?branch=master)](https://coveralls.io/github/uca-is2/2021-superpoderosas?branch=master)
+![GHA Status](https://github.com/MaleBurs/2021-superpoderosas/actions/workflows/GHA.yml/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/MaleBurs/2021-superpoderosas/badge.svg?branch=master)](https://coveralls.io/github/MaleBurs/2021-superpoderosas?branch=master)
 
 ## Metacello
 
