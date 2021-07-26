@@ -11,8 +11,8 @@ Class {
 }
 
 { #category : #inicialization }
-CardHandler class >> managing: aDeck for: players [ 
-	^ self new initializeManaging: aDeck for: players
+CardHandler class >> managing: aDeck for: players and: fields [
+	^ self new initializeManaging: aDeck for: players and: fields
 ]
 
 { #category : #private }
@@ -27,15 +27,35 @@ CardHandler >> affect: aTarget using: aCard by: aPlayer on: aBoardGame [
 ]
 
 { #category : #'actions - cards' }
-CardHandler >> cancel: cardToBeCancelled with: aCard [
+CardHandler >> cancel: cardToBeCancelled with: aCard on: aBoardGame [
+	| target |
 	self validateIfAnyPlayerHas: cardToBeCancelled.
+	target:= self findTargetContaining: cardToBeCancelled.
 	self removeFromInfluentialCards: cardToBeCancelled.
-	self addToCardsRecord: aCard
+	self addToCardsRecord: aCard.
+	cardToBeCancelled notifyCancellationRegarding: target on: aBoardGame.
 ]
 
 { #category : #accessing }
 CardHandler >> cardsInHandOf: player [
 	^ cardsInHand at: player.
+]
+
+{ #category : #private }
+CardHandler >> defineInfluentialCardsOf: players and: fields [
+	| targetsInfluentialCards targets |
+	targets := self defineTargetsWith: players and: fields.
+	targetsInfluentialCards := targets collect: [ :player | OrderedCollection new ].
+	influentialCards := OrderedDictionary newFromKeys: targets andValues: targetsInfluentialCards
+]
+
+{ #category : #private }
+CardHandler >> defineTargetsWith: players and: fields [
+	| targets fieldNumeration |
+	fieldNumeration := OrderedCollection new.
+	1 to: fields size do: [ :fieldNumber | fieldNumeration add: fieldNumber ].
+	targets := players , fieldNumeration.
+	^ targets
 ]
 
 { #category : #'actions - cards' }
@@ -53,35 +73,37 @@ CardHandler >> errorMessageThePlayerDoesNotHaveTheCardToBeCancel [
  ^'The player does not have the card to be cancelled.'
 ]
 
+{ #category : #accessing }
+CardHandler >> findTargetContaining: card [
+	^ (self selectAssociationsContaining: card) keys first.
+]
+
 { #category : #'actions - cards' }
-CardHandler >> influence: player with: card [
-	| playerInfluentialCards |
-	playerInfluentialCards := influentialCards at:player.
-	playerInfluentialCards add: card.
-	influentialCards at: player put: playerInfluentialCards.
+CardHandler >> influence: target with: card [
+	| targetInfluentialCards |
+	targetInfluentialCards := influentialCards at: target .
+	targetInfluentialCards add: card.
+	influentialCards at: target put: targetInfluentialCards.
 	self addToCardsRecord: card.
 ]
 
 { #category : #'actions - cards' }
 CardHandler >> influenceAllPlayers: card [ 
-	influentialCards do: [ :playerInfluentialCards | playerInfluentialCards add: card ].
+	influentialCards do: [ :targetInfluentialCards | targetInfluentialCards add: card ].
 	self addToCardsRecord: card 
 ]
 
 { #category : #accessing }
-CardHandler >> influentialCardsOf: player [
-	^ influentialCards at: player
+CardHandler >> influentialCardsOf: target [
+	^ influentialCards at: target.
 ]
 
-{ #category : #validations }
-CardHandler >> initializeManaging: aDeck for: players [ 
-	| playersInfluentialCards |
-	deck:= aDeck.
-	cardsInHand:= OrderedDictionary newFromKeys: players andValues:(players collect:[:player |(aDeck pickUp:2)]).
-	playersInfluentialCards:= players collect: [ :player | OrderedCollection new ].
-	influentialCards:= OrderedDictionary newFromKeys: players andValues: playersInfluentialCards.
-	cardsHistory:= OrderedCollection new.
-
+{ #category : #initialize }
+CardHandler >> initializeManaging: aDeck for: players and: fields [
+	deck := aDeck.
+	cardsInHand := OrderedDictionary newFromKeys: players andValues: (players collect: [ :player | aDeck pickUp: 2 ]).
+	self defineInfluentialCardsOf: players and: fields.
+	cardsHistory := OrderedCollection new
 ]
 
 { #category : #'actions - cards' }
@@ -98,8 +120,7 @@ CardHandler >> removeFromInfluentialCards: cardToBeCancelled [
 
 { #category : #'actions - cards' }
 CardHandler >> repeatLastCardThrownBy: aPlayer affecting: aTarget on: aBoardGame [
-	(cardsHistory isEmpty) 
-	ifFalse: [ (cardsHistory last) thrownBy: aPlayer aims: aTarget on: aBoardGame handledBy: self].
+	cardsHistory  ifNotEmpty: [ (cardsHistory last) thrownBy: aPlayer aims: aTarget on: aBoardGame handledBy: self].
 ]
 
 { #category : #private }

@@ -10,7 +10,11 @@ Speed >> action [
 ]
 
 { #category : #actions }
+Speed >> notifyCancellationRegarding: target on: aBoardGame [
+]
+
+{ #category : #actions }
 Speed >> thrownBy: aPlayer aims: aTarget on: aBoardGame handledBy: cardHandler [ 
-	aBoardGame validateThrowOfAPermanent: self by: aPlayer.
+	aBoardGame verifyIfItIsTheTurnOf: aPlayer.
 	cardHandler influence: aTarget with: self.
 ]

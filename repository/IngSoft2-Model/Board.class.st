@@ -4,7 +4,7 @@ Class {
 	#instVars : [
 		'fields',
 		'effectsHistory',
-		'positionsTracker'
+		'trackers'
 	],
 	#category : #'IngSoft2-Model'
 }
@@ -15,9 +15,9 @@ Board class >> errorMessageNumberOfFieldsMustBeGreaterThanOne [
 ]
 
 { #category : #initialization }
-Board class >> has: fields [ 
+Board class >> has: fields usedBy: players [.
 	self verifyIfItHasAtLeastTwoFields: fields.
-	^self new initializeHaving: fields.
+	^self new initializeHaving: fields usedBy:players.
 ]
 
 { #category : #validations }
@@ -27,16 +27,40 @@ Board class >> verifyIfItHasAtLeastTwoFields: numberOfFields [.
 ]
 
 { #category : #'actions - effects' }
+Board >> add: effect on: fieldNumber [
+	| oldField effects |
+	oldField := fields at: fieldNumber.
+	effects := self add: effect toEffectsFrom: oldField.
+	self replaceFieldOf: fieldNumber withFieldAffectedBy: effects.
+]
+
+{ #category : #private }
+Board >> add: effect toEffectsFrom:oldField [
+	| effects |
+	effects:= oldField effects.
+	effects add: effect.
+	^effects
+]
+
+{ #category : #'actions - effects' }
 Board >> applyAt: aBoardGame lastEffectTo: aPlayer [
 	effectsHistory last effectTriggeredBy: aPlayer on: self of: aBoardGame.
 	self orderPlayersPosition.
+]
+
+{ #category : #'actions - status' }
+Board >> block: player [
+	| playerTracker |
+	playerTracker := self positionOf: player.
+	trackers remove: playerTracker.
+	trackers add: (Tracker of: player standingOn: (playerTracker field)  after:  (playerTracker round) definedBy: BlockedCondition new ).
 ]
 
 { #category : #private }
 Board >> considerEffectOf: field on: aBoardGame for: player [
 	| effect |
 	effect := field effectTriggeredBy: player on: self of: aBoardGame.
-	effectsHistory add: effect
+	effectsHistory add: effect.
 ]
 
 { #category : #private }
@@ -45,23 +69,37 @@ Board >> determinateAdditionalRoundsBasingOn: totalFields [
 	
 ]
 
+{ #category : #'error messages' }
+Board >> errorMessagePlayerWasNeverBlocked [
+	^ 'A Freedom card can not be played on a player who was never blocked'
+]
+
 { #category : #private }
 Board >> findNewPositionWhen: player hasMoved: aNumberOfFields from: oldPosition [
-	| totalFields newPosition newRoundNumber newFieldNumber |
-	totalFields := oldPosition field + aNumberOfFields.
+	| totalFields newRoundNumber newFieldNumber |
+	totalFields:= oldPosition findFieldAfterIntentionToMove: aNumberOfFields.
 	newFieldNumber := self lookUpResultingFieldNumberBasingOn: totalFields.
-	newRoundNumber :=  oldPosition round + (self determinateAdditionalRoundsBasingOn: totalFields).
-	newPosition := Tracker of: player standingOn: newFieldNumber after: newRoundNumber.
-	newPosition := self validate: newPosition.
+	newRoundNumber := oldPosition round + (self determinateAdditionalRoundsBasingOn: totalFields).
+	^ self
+		generateValidTrackerFor: player
+		standingOn: newFieldNumber
+		after: newRoundNumber
+		determinedBy: oldPosition status.
+]
+
+{ #category : #private }
+Board >> generateValidTrackerFor: player standingOn: newFieldNumber after: newRoundNumber determinedBy: status [
+	| newPosition |
+	newPosition := Tracker of: player standingOn: newFieldNumber after: newRoundNumber definedBy: status.
+	newPosition := self validateIfPlayerShouldBeAtTheBeginningBasingOn: newPosition.
 	^ newPosition
-	
 ]
 
 { #category : #initialize }
-Board >> initializeHaving: someFields [ 
+Board >> initializeHaving: someFields usedBy:players [.
 	fields := someFields .
-	positionsTracker:= OrderedCollection new.
 	effectsHistory:= OrderedCollection new.
+	self placeAtTheBeggining: players.
 ]
 
 { #category : #private }
@@ -77,35 +115,33 @@ Board >> lookUpResultingFieldNumberBasingOn: totalFields [
 ]
 
 { #category : #'actions - move' }
-Board >> move: player along: result on: aBoardGame [ 
+Board >> move: player along: result on: boardGame [ 
 	| newPosition field |
 	newPosition := self move: player over: result.
 	field := self searchFieldFor: newPosition.
-	self considerEffectOf: field on: aBoardGame for: player.
+	self considerEffectOf: field on: boardGame for: player.
 ]
 
 { #category : #'actions - move' }
-Board >> move: player over: aNumberOfFields [ 
-	| newPosition oldPosition |
+Board >> move: player over: aNumberOfFields [
+	| oldPosition newPosition |
 	oldPosition := self positionOf: player.
 	newPosition := self findNewPositionWhen: player hasMoved: aNumberOfFields from: oldPosition.
-	positionsTracker removeAllSuchThat:[:position | position player = player].
 	self replaceOldPositioOf: player with: newPosition.
-	^ newPosition
+	^ newPosition.
 ]
 
 { #category : #'actions - move' }
 Board >> moveAllPlayers: aNumberOfFields except: aPlayer [ 
 	| playerPosition |
-	playerPosition := positionsTracker detect:[:position | position player = aPlayer].
-	positionsTracker  := positionsTracker reject: [ :position | position player = aPlayer ] thenCollect: [ :position | self findNewPositionWhen: (position player) hasMoved: aNumberOfFields from: position].
-	positionsTracker add: playerPosition .
+	playerPosition := trackers detect:[:position | position player = aPlayer].
+	trackers  := trackers reject: [ :position | position player = aPlayer ] thenCollect: [ :position | self findNewPositionWhen: (position player) hasMoved: aNumberOfFields from: position].
+	trackers add: playerPosition .
 ]
 
 { #category : #'actions - move' }
-Board >> moveAllPlayersTo: aSpecificField [
-	positionsTracker := positionsTracker collect: [ :position | Tracker of: (position player) standingOn: aSpecificField after: (position round) ]
-	
+Board >> moveAllPlayersToTheBeginningOfLap [
+	trackers := trackers collect: [ :position | Tracker of: (position player) standingOn: (position resetFieldNumber) after: (position round) ]
 ]
 
 { #category : #accessing }
@@ -115,19 +151,36 @@ Board >> numberOfFields [
 
 { #category : #actions }
 Board >> orderPlayersPosition [
-	^positionsTracker
-		sort: [ :aPosition :anotherPosition | aPosition >= anotherPosition ]
+	^ trackers sort: [ :aPosition :anotherPosition | aPosition >= anotherPosition ]
 	
 ]
 
-{ #category : #'actions - move' }
+{ #category : #private }
 Board >> placeAtTheBeggining: players [
-	positionsTracker := OrderedCollection newFrom: (players collect: [ :aPlayer | Tracker of: aPlayer standingOn: 1 after: 1 ]).
+	trackers := OrderedCollection newFrom: (players collect: [ :aPlayer | Tracker of: aPlayer standingOn: 1 after: 1 ]).
 ]
 
 { #category : #accessing }
 Board >> positionOf: aPlayer [
- ^ positionsTracker detect: [ :aPosition | aPosition player = aPlayer].
+	^ trackers
+		detect: [ :aPosition | aPosition player = aPlayer ]
+	
+]
+
+{ #category : #'actions - effects' }
+Board >> remove: effect from: fieldNumber [
+	| oldField  effects|
+	oldField:= fields at: fieldNumber.
+	effects:= self remove: effect fromEffectsOf:oldField.
+	self replaceFieldOf: fieldNumber withFieldAffectedBy: effects.
+]
+
+{ #category : #private }
+Board >> remove: effect fromEffectsOf:oldField [
+	| effects |
+	effects:= oldField effects.
+	effects remove: effect.
+	^effects
 ]
 
 { #category : #'actions - effects' }
@@ -137,10 +190,17 @@ Board >> repeatAt: aBoardGame lastEffectAppliedOn: aPlayer [
 			[ self applyAt: aBoardGame lastEffectTo: aPlayer].
 ]
 
+{ #category : #private }
+Board >> replaceFieldOf: fieldNumber withFieldAffectedBy: effects [
+	| newField |
+	newField := Field affectedBy: effects.
+	fields at: fieldNumber put: newField
+]
+
 { #category : #actions }
 Board >> replaceOldPositioOf: player with: newPosition [
-	positionsTracker removeAllSuchThat:[:position | position player = player].
-	positionsTracker add: newPosition
+	trackers removeAllSuchThat:[:position | position player = player].
+	trackers add: newPosition
 	
 ]
 
@@ -149,8 +209,28 @@ Board >> searchFieldFor: aPosition [
 	^ fields at: aPosition field
 ]
 
+{ #category : #'actions - status' }
+Board >> unblock: player [
+	| playerTracker |
+	playerTracker:= self positionOf: player.
+	trackers remove: playerTracker.
+	trackers add: (Tracker of: player standingOn: (playerTracker field)  after:  (playerTracker round)).
+]
+
+{ #category : #'actions - status' }
+Board >> unblockBlocked: player [
+   self validateIfPlayerIsBlocked: player.
+	self unblock: player.
+]
+
+{ #category : #'error messages' }
+Board >> validateIfPlayerIsBlocked: player [
+	((self positionOf: player) isBlocked)
+		ifFalse: [ Error signal: self errorMessagePlayerWasNeverBlocked ]
+]
+
 { #category : #validations }
-Board >> validate: aPosition [
+Board >> validateIfPlayerShouldBeAtTheBeginningBasingOn: aPosition [
  (aPosition round <= 0) ifTrue: [^( Tracker of: (aPosition player) standingOn: 1 after: 1)] ifFalse:[^aPosition].
 	
 ]
