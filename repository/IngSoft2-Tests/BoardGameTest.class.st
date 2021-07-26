@@ -920,6 +920,27 @@ BoardGameTest >> testAPlayerUsesACancellationCardAndRemovesAnAccelerationCard [
 ]
 
 { #category : #playingWithCardsTests }
+BoardGameTest >> testAPlayerUsesACancellationCardAndRemovesAnOverloadCardFromAField [
+	| aBoardGame aGroupOfPlayers cancellationCard overloadCard aSequenceOfDiceResults cards anotherOverloadCard anotherCancellationCard speedPlusCard |
+	overloadCard := Overload new.
+	cancellationCard := Cancellation new.
+	anotherOverloadCard := Overload new.
+	anotherCancellationCard := Cancellation new.
+	speedPlusCard := SpeedPlus withSpeedEffect.
+	aGroupOfPlayers := OrderedCollection newFrom: {#pau . #belu}.
+	aSequenceOfDiceResults := #(9 10 7 3).
+	cards := { overloadCard . cancellationCard . speedPlusCard . anotherCancellationCard . anotherOverloadCard }.
+	
+	aBoardGame := self generateABoardGamePlayedBy: aGroupOfPlayers using: cards andBasedOn: aSequenceOfDiceResults.
+
+	aBoardGame affect: #pau using: overloadCard by: #pau.
+	aBoardGame affect: overloadCard using: cancellationCard by: #pau.
+
+	self assert: (aBoardGame influentialCardsOf: #pau) equals: (OrderedCollection new).
+	
+]
+
+{ #category : #playingWithCardsTests }
 BoardGameTest >> testAPlayerUsesADoOverCardWhenNoDiceHasBeenThrowsThusItHasNoEffect [
 	| aBoardGame aGroupOfPlayers doOverCard  pauPosition beluPosition speedCard aSequenceOfDiceResults cards anotherDoOverCard aThirdSpeedCard |	
 	speedCard := Speed new.
